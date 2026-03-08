@@ -1,0 +1,170 @@
+/* Styles extracted from App.jsx for easier reading and debugging */
+.app-root { padding-top: 4rem; padding-bottom: 4rem; }
+.title { text-align: center; font-size: 1.125rem; font-weight: 700; text-transform: uppercase; margin-bottom: 1rem; /* constrained so header left/right don't overlap */ }
+.app-container { display: flex; width: 100%; max-width: 1024px; margin: 0 auto; padding-left: 1.5rem; padding-right: 1.5rem; justify-content: center; align-items: flex-start; }
+.app-form { width: 100%; }
+.dropzone { display: flex; width: 100%; cursor: pointer; justify-content: center; border-style: dashed; border-width: 1px; border-color: #dc2626; padding: 2rem; border-radius: 0.375rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); background: rgba(255,255,255,0.8); color: #000; }
+.dropzone-inner { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.upload-icon { margin-bottom: 1rem; width: 1.5rem; height: 1.5rem; }
+.upload-text { margin-bottom: 0.5rem; font-size: 0.875rem; }
+.select-folder-btn { margin-top: 0.5rem; font-size: 0.75rem; text-decoration: underline; color: #2563eb; }
+.muted { font-size: 0.75rem; color: #6b7280; }
+.file-list { margin-top: 1rem; display: grid; gap: 0.5rem; }
+.file-item { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; border-radius: 0.375rem; border: 1px solid #e5e7eb; padding: 0.5rem 0.75rem; }
+.file-left { display:flex; align-items:center; gap:0.75rem; }
+.file-preview img { height: 2.5rem; width: 2.5rem; object-fit: cover; }
+.file-name { font-weight: 600; }
+.file-meta { font-size: 0.75rem; color: #6b7280; }
+.file-actions { display:flex; gap:0.5rem; align-items:center; }
+.controls { margin-top: 0.75rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.btn { padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; }
+.btn-black { background: #000; color: #fff; }
+.btn-gray { background: #374151; color: #fff; }
+.btn-blue { background: #2563eb; color: #fff; }
+.small-border { border-radius:9999px; border:1px solid #d1d5db; padding:0.35rem 0.5rem; }
+.submit-area { margin-top: 0.875rem; }
+.submit-btn { background: #000; color: #fff; width: 100%; margin-top: 0.75rem; padding: 0.75rem 0; border-radius: 0.375rem; }
+	.app-root { min-height: 100vh; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding-top: 0; padding-bottom: 2.5rem; }
+    
+	/* Fixed header stays at top; content below is centered */
+	.app-header { position: fixed; top: 0; left: 0; right: 0; height: 72px; display:flex; align-items:center; justify-content:space-between; max-width:1100px; margin: 0 auto; padding: 0 1rem; width:100%; background: transparent; backdrop-filter: none; box-shadow: none; z-index: 60; }
+
+	/* small downward offset for the centered title so it sits lower in the header */
+	.app-header .title { margin-top: 0; }
+	.title { margin-top: 0.25rem; }
+
+	/* 3D / fancy styles */
+	.title {
+		font-size: 1.6rem;
+		font-weight: 900;
+		letter-spacing: .03em;
+		background: linear-gradient(90deg,#ff6b6b,#ff2d95 60%);
+		-webkit-background-clip: text;
+		background-clip: text;
+		color: transparent;
+		text-shadow:
+			0 1px 0 rgba(0,0,0,0.12),
+			0 2px 0 rgba(0,0,0,0.08),
+			0 6px 20px rgba(0,0,0,0.18);
+	}
+
+	.dropzone {
+		display: flex; width: 100%; max-width: 880px; cursor: pointer; justify-content: center; border-style: dashed; border-width: 1px; border-color: #dc2626; padding: 1.25rem; border-radius: 0.75rem; box-shadow: 0 18px 40px rgba(16,24,40,0.08); background: linear-gradient(180deg,#ffffff,#fbfbfd); color: #000; transform: translateZ(0); transition: transform .18s ease, box-shadow .18s ease;
+	}
+	.dropzone:hover { transform: translateY(-8px) rotateX(1deg); box-shadow: 0 30px 60px rgba(16,24,40,0.14); }
+
+	.dropzone-inner { transform: translateZ(20px); }
+
+	.file-item { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; border-radius: 0.5rem; border: 1px solid #e5e7eb; padding: 0.4rem 0.5rem; background: linear-gradient(180deg,#fff,#f9fafb); box-shadow: 0 6px 18px rgba(16,24,40,0.06); transition: transform .12s ease, box-shadow .12s ease; }
+	.file-item:hover { transform: translateY(-6px); box-shadow: 0 18px 40px rgba(16,24,40,0.10); }
+
+	.file-preview img { border-radius: 6px; box-shadow: 0 6px 18px rgba(16,24,40,0.08); }
+.title { text-align: center; font-size: 1.125rem; font-weight: 900; text-transform: uppercase; margin-bottom: 0.75rem; letter-spacing: .02em; }
+.app-header { display:flex; align-items:center; justify-content:space-between; max-width:1100px; margin: 0 auto 1.5rem; padding: 0 1rem; width:100%; }
+	.app-container { display: flex; width: 100%; max-width: 1100px; margin: 0 auto; padding-left: 1rem; padding-right: 1rem; justify-content: center; align-items: center; flex-direction: column; gap: 2rem; min-height: calc(100vh - 72px); }
+ .header-left { width: 160px; }
+ .header-right { width: 220px; display:flex; justify-content:flex-end; }
+
+/* User menu */
+.user-menu { position: relative; }
+.user-button { display:inline-flex; align-items:center; gap:0.25rem; background:#111827; color:#fff; border:1px solid rgba(0,0,0,0.2); padding:0.25rem 0.35rem; border-radius:9999px; cursor:pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.12); }
+.user-button .user-name { display:none; }
+.profile-icon { width: 1.6rem; height: 1.6rem; color: #fff; }
+
+/* Prevent the centered page title from being overlapped by header sides.
+	 Subtract left+right header widths (160px + 220px = 380px) so the title
+	 stays centered in the remaining space. */
+.title { max-width: calc(100% - 380px); margin-left: auto; margin-right: auto; }
+
+@media (max-width: 900px) {
+	/* on narrower screens allow the title to shrink more to avoid overlap */
+	.title { max-width: calc(100% - 160px); }
+	.header-right { width: 160px; }
+}
+
+@media (max-width: 480px) {
+	.title { max-width: calc(100% - 120px); font-size: 1.25rem; }
+	.profile-icon { width: 1.2rem; height: 1.2rem; }
+}
+.user-button .caret { font-size:0.85rem; color:#fff; }
+.user-dropdown { position:absolute; right:0; top:calc(100% + 8px); background:#fff; border:1px solid #e5e7eb; box-shadow:0 12px 30px rgba(16,24,40,0.12); border-radius:0.5rem; min-width:220px; z-index:50; transform-origin: top right; transition: transform .12s ease, opacity .12s ease; }
+.user-dropdown { opacity: 1; transform: translateY(0); }
+.user-dropdown-item { padding:0.6rem 0.9rem; font-size:0.95rem; border-bottom:1px solid #f3f4f6; color:#111827; }
+.user-dropdown-item.user-logout { background:transparent; border:none; width:100%; text-align:left; color:#dc2626; cursor:pointer; font-weight:600; }
+.user-dropdown-item:last-child { border-bottom: none; }
+
+/* Make the menu accessible on hover as well as click */
+.user-menu:hover .user-dropdown { opacity:1; transform:translateY(0); }
+.app-form { width: 100%; max-width: 980px; }
+.dropzone { display: flex; width: 100%; max-width: 880px; cursor: pointer; justify-content: center; border-style: dashed; border-width: 1px; border-color: #dc2626; padding: 1.25rem; border-radius: 0.375rem; box-shadow: 0 6px 10px -3px rgba(0,0,0,0.08); background: rgba(255,255,255,0.9); color: #000; }
+.dropzone-inner { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.upload-icon { margin-bottom: 0.5rem; width: 1.25rem; height: 1.25rem; }
+.upload-text { margin-bottom: 0.25rem; font-size: 0.8125rem; }
+.select-folder-btn { margin-top: 0.35rem; font-size: 0.75rem; text-decoration: underline; color: #2563eb; }
+.muted { font-size: 0.75rem; color: #6b7280; }
+.file-list { margin-top: 0.75rem; display: grid; gap: 0.5rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.file-item { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; border-radius: 0.375rem; border: 1px solid #e5e7eb; padding: 0.4rem 0.5rem; }
+.file-left { display:flex; align-items:center; gap:0.5rem; }
+.file-preview img { height: 2rem; width: 2rem; object-fit: cover; }
+.file-name { font-weight: 600; font-size: 0.9rem; }
+.file-meta { font-size: 0.6875rem; color: #6b7280; }
+.file-actions { display:flex; gap:0.4rem; align-items:center; }
+.controls { margin-top: 0.5rem; display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+.btn { padding: 0.4rem 0.6rem; border-radius: 0.375rem; font-size: 0.8125rem; border: 1px solid rgba(0,0,0,0.12); background: #ffffff; }
+.btn-black { background: #000 !important; color: #fff !important; border-color: #000 !important; }
+.btn-gray { background: #374151; color: #fff; border-color: #374151; }
+.btn-blue { background: #2563eb !important; color: #fff !important; border-color: #2563eb !important; }
+.btn:hover { filter: brightness(0.95); }
+.small-border { border-radius:9999px; border:1px solid #9ca3af; padding:0.25rem 0.4rem; background: #ffffff; }
+.file-actions button { border: 1px solid #e5e7eb; background: #ffffff; padding: 0.25rem; border-radius: 0.375rem; }
+.file-actions button:hover, .small-border:hover { border-color: #6b7280; }
+.submit-area { margin-top: 0.6rem; }
+.submit-btn { background: #000 !important; color: #fff !important; width: 100%; margin-top: 0.5rem; padding: 0.6rem 0; border-radius: 0.375rem; border: 1px solid #000 !important; box-shadow: none; }
+.submit-btn:hover { filter: brightness(0.9); }
+.controls label { background: rgba(255,255,255,0.95); border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.2rem 0.45rem; display: inline-flex; align-items: center; gap: 0.4rem; margin-right: 0.4rem; font-size: 0.85rem; }
+.controls input[type="number"] { border: 1px solid #d1d5db; border-radius: 0.25rem; padding: 0.12rem 0.35rem; margin-left: 0.35rem; width: 64px; }
+.controls input[type="checkbox"] { margin-left: 0.35rem; transform: translateY(1px); }
+.controls .btn { margin-left: 0.2rem; }
+
+/* Box around controls for clearer separation inside page */
+.controls-box { border: 1px solid #2563eb; background: rgba(37,99,235,0.06); padding: 0.5rem; border-radius: 0.375rem; margin-top: 0.5rem; }
+.controls-box .controls { margin: 0; }
+
+/* Larger UI adjustments: bigger title, bigger dropzone and previews */
+.title { font-size: 2.6rem !important; line-height: 1.05; margin-bottom: 1rem; }
+.dropzone { padding: 2.5rem !important; max-width: 980px; border-radius: 1rem; }
+.dropzone-inner { gap: 0.75rem; }
+.upload-icon { width: 3rem !important; height: 3rem !important; margin-bottom: 1rem; }
+.upload-text { font-size: 1.125rem !important; }
+.file-item { padding: 0.8rem 1rem !important; }
+.file-preview img { height: 3.5rem !important; width: 3.5rem !important; }
+.submit-btn { padding: 1rem 0 !important; font-size: 1rem; }
+
+/* Center the Run Analysis button inside the controls */
+.controls-center { width: 100%; display: flex; justify-content: center; margin-top: 0.5rem; }
+
+
+@media (max-width: 640px) {
+	.file-list { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.4rem; }
+	.dropzone { padding: 1rem; }
+	.upload-icon { width: 1rem; height: 1rem; }
+	.file-preview img { height: 1.75rem; width: 1.75rem; }
+	.btn { padding: 0.35rem 0.5rem; font-size: 0.75rem; }
+}
+
+/* Auth page styles */
+.auth-root { min-height: calc(100vh - 72px); display:flex; align-items:center; justify-content:center; padding: 1.5rem; }
+.auth-box { width: 440px; max-width: calc(100% - 2rem); padding: 2rem; border-radius: 12px; border: 1px solid #e6e9ee; box-shadow: 0 18px 40px rgba(16,24,40,0.06); background: linear-gradient(180deg,#ffffff,#fbfdff); }
+.auth-title { text-align:center; margin:0 0 1rem 0; font-size:1.4rem; font-weight:800; }
+.auth-error { color:#b91c1c; background: rgba(249, 115, 22, 0.05); padding:0.5rem; border-radius:6px; margin-bottom:0.75rem; font-size:0.95rem; }
+.auth-form { display:flex; flex-direction:column; gap:0.75rem; }
+.auth-input { padding:0.75rem 0.9rem; border-radius:8px; border:1px solid #e6e9ee; font-size:1rem; width:100%; }
+.auth-actions { display:flex; gap:0.5rem; justify-content:center; margin-top:0.25rem; }
+.auth-actions .btn-primary { display:inline-block; min-width:140px; background:#111827 !important; color:#fff !important; border:1px solid rgba(0,0,0,0.08); padding:0.6rem 1.1rem; border-radius:8px; font-weight:700; box-shadow: 0 6px 18px rgba(0,0,0,0.12); }
+.auth-actions .btn-outline { display:inline-block; min-width:140px; background:transparent !important; color:#111827 !important; border:1px solid #111827; padding:0.55rem 1rem; border-radius:8px; font-weight:700; }
+.auth-actions .btn-primary:focus, .auth-actions .btn-outline:focus { outline: 3px solid rgba(37,99,235,0.18); }
+
+@media (max-width: 480px) {
+  .auth-box { padding: 1rem; }
+  .auth-title { font-size: 1.1rem; }
+}

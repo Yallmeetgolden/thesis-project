@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@import url('https://fonts.cdnfonts.com/css/poppins');
+
+body {
+	background-image: url('/image/ai-imagery.webp');
+	background-size: cover;
+	background-position: center;
+	background-repeat: no-repeat;
+	background-attachment: fixed;
+	font-family: 'Poppins', sans-serif;
+}

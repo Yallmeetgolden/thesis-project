@@ -1,0 +1,336 @@
+# Photo AI Culling Tool
+
+## Goal
+Help photographers quickly remove bad photos using AI.
+
+
+## Phase 1
+- [ ] Sharpness scoring
+- [ ] Exposure scoring
+- [ ] Contrast scoring
+- [ ] Final score
+
+## Phase 2
+- [ ] Top N selection
+
+## Phase 3
+- [ ] Embeddings
+- [ ] Clustering
+- [ ] Duplicate penalty
+
+
+## Features
+- Blur detection
+- Duplicate grouping
+- Lighting analysis
+- User-controlled deletion
+
+## Tech Stack
+- Python, OpenCV, FastAPI
+- React (Vite)
+
+## Milestones
+- [ ] Blur detection script
+- [ ] Lighting analysis
+- [ ] Similarity grouping
+- [ ] API endpoints
+- [ ] Frontend integration
+
+
+# Photo AI Culling Tool
+
+## Goal
+
+Build an AI-assisted photo culling system that helps photographers **rank and select the best photos** from large batches by analyzing sharpness, lighting, contrast, and redundancy — while keeping the final deletion decision in the user’s control.
+
+---
+
+## Core Use Case
+
+* Input: 300–1000 photos from a shoot
+* Output:
+
+  * Ranked list of photos (best → worst)
+  * Recommended **Top N (e.g. 100)** photos
+  * Grouping of similar / repeated shots
+  * Clear reasons: blurry, bad lighting, duplicate
+
+---
+
+## System Architecture (High Level)
+
+Frontend (React)
+→ Backend API (FastAPI)
+→ Image Analysis Pipeline (Python)
+→ Scoring & Ranking Engine
+→ Results (JSON)
+
+Frontend only **displays results**. All decisions happen in the backend.
+
+---
+
+## Phase 0 — Environment & Project Setup
+
+### Objectives
+
+* Prepare development environment
+* Lock tooling and project structure
+
+### Tools
+
+* Python 3.10+
+* Node.js (LTS)
+* VS Code
+* Git & GitHub
+* Python venv
+
+### Tasks
+
+* Create GitHub repository
+* Set up backend & frontend folders
+* Verify Python and Node installations
+
+### Deliverables
+
+* Project structure created
+* First commit pushed
+
+---
+
+## Phase 1 — Image Quality Scoring (FOUNDATION)
+
+This phase answers: **“How good is each photo?”**
+
+### Metrics Implemented
+
+#### 1. Sharpness Scoring
+
+* Method: Laplacian variance
+* Purpose: Detect blur
+
+#### 2. Exposure Scoring
+
+* Method: Mean brightness distance from mid-gray
+* Purpose: Penalize under/over-exposed images
+
+#### 3. Contrast Scoring
+
+* Method: Standard deviation of grayscale histogram
+* Purpose: Detect flat images
+
+#### 4. Final Quality Score
+
+Weighted combination:
+
+```
+Final Score =
+0.4 * Sharpness
++ 0.3 * Exposure
++ 0.3 * Contrast
+```
+
+### Tools
+
+* Python
+* OpenCV
+* NumPy
+
+### Output (per image)
+
+```json
+{
+  "filename": "img_001.jpg",
+  "sharpness": 0.82,
+  "exposure": 0.74,
+  "contrast": 0.65,
+  "final_score": 0.76
+}
+```
+
+### Deliverables
+
+* Script that analyzes a folder of images
+* JSON file with scores for all images
+
+### Phase 1 Checklist
+
+* [ ] Sharpness scoring
+* [ ] Exposure scoring
+* [ ] Contrast scoring
+* [ ] Final score calculation
+
+---
+
+## Phase 2 — Ranking & Top N Selection
+
+This phase answers: **“Which photos should I keep?”**
+
+### Logic
+
+* Sort all images by `final_score`
+* Select Top N (e.g. Top 100)
+
+### Tools
+
+* Python
+
+### Output
+
+```json
+{
+  "selected": [/* top N images */],
+  "others": [/* remaining images */]
+}
+```
+
+### Deliverables
+
+* Ranked list of images
+* Configurable Top N selection
+
+### Phase 2 Checklist
+
+* [ ] Image ranking
+* [ ] Top N selection
+
+---
+
+## Phase 3 — Duplicate & Repeated Pose Handling
+
+This phase prevents near-identical photos from dominating the Top N.
+
+### Steps
+
+#### 1. Image Embeddings
+
+* Use pretrained CNN to convert images to vectors
+
+#### 2. Similarity Measurement
+
+* Cosine similarity between embeddings
+
+#### 3. Clustering
+
+* Group similar photos
+
+#### 4. Duplicate Penalty
+
+* Keep best photo per cluster
+* Penalize others in ranking
+
+### Tools
+
+* PyTorch
+* Pretrained model (ResNet or CLIP)
+* scikit-learn
+
+### Output
+
+```json
+{
+  "group_id": 1,
+  "images": ["a.jpg", "b.jpg", "c.jpg"],
+  "best": "b.jpg"
+}
+```
+
+### Phase 3 Checklist
+
+* [ ] Embedding generation
+* [ ] Similarity computation
+* [ ] Clustering
+* [ ] Duplicate penalty applied
+
+---
+
+## Phase 4 — Backend API (FastAPI)
+
+### Responsibilities
+
+* Receive image uploads
+* Run analysis pipeline
+* Return structured JSON results
+* Delete files only after user confirmation
+
+### Endpoints
+
+```
+POST /upload
+POST /analyze
+GET  /results
+POST /delete
+```
+
+### Tools
+
+* FastAPI
+* Python
+* Pydantic
+
+### Deliverables
+
+* Fully functional local API
+* API tested via Postman or curl
+
+---
+
+## Phase 5 — Frontend Integration
+
+### Responsibilities
+
+* Upload images
+* Display analysis results
+* Show Top N recommendations
+* Ask for delete confirmation
+
+### Tools
+
+* React (Vite)
+* Fetch or Axios
+* Image upload template
+
+### Frontend Does NOT
+
+* Perform AI logic
+* Decide thresholds
+* Auto-delete files
+
+### Deliverables
+
+* End-to-end working system (local)
+
+---
+
+## Feature Summary
+
+* Blur detection
+* Lighting analysis
+* Contrast evaluation
+* Duplicate grouping
+* Top N photo selection
+* User-controlled deletion
+
+---
+
+## Milestones Overview
+
+* [ ] Phase 1: Image quality scoring complete
+* [ ] Phase 2: Ranking & Top N selection
+* [ ] Phase 3: Duplicate handling
+* [ ] Phase 4: Backend API
+* [ ] Phase 5: Frontend integration
+
+---
+
+## Definition of Success
+
+* Can process 500 photos in one run
+* Produces a ranked list that visually makes sense
+* Reduces photographer culling time by >70%
+
+---
+
+## Guiding Principle
+
+**Accuracy beats cleverness. Control beats automation. Finish phases before adding features.**
+
