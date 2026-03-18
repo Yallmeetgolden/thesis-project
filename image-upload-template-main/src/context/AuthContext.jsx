@@ -7,7 +7,7 @@ export function useAuth() {
 }
 
 // The PHP API will run on port 8000 under /server/api when using php -S
-const API_BASE = 'http://localhost:8000/server/api';
+const API_BASE = 'http://127.0.0.1:8000/server/api';
 
 function storeToken(token) {
   if (token) localStorage.setItem('auth_token', token);

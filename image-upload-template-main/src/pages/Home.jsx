@@ -1,6 +1,5 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { FormikProvider, useFormik } from 'formik';
-import { useDropzone } from 'react-dropzone';
 import { Icon } from '@iconify/react';
 import JSZip from 'jszip';
 import { _uploadImage, useImageUpload } from '../api/image';
@@ -40,6 +39,20 @@ export default function Home(){
   const [running, setRunning] = useState(false);
   const { logout, currentUser } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [uploadCount, setUploadCount] = useState(0);
+  const [uploadArchiveName, setUploadArchiveName] = useState('');
+  const [uploadArchiveSize, setUploadArchiveSize] = useState(0);
+  const [selectedZipFile, setSelectedZipFile] = useState(null);
+  const [selectedZipImageCount, setSelectedZipImageCount] = useState(0);
+  const [inspectingZip, setInspectingZip] = useState(false);
+  const [uploadingZip, setUploadingZip] = useState(false);
+  const [processingZip, setProcessingZip] = useState(false);
+  const [analysisDone, setAnalysisDone] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [processingProgress, setProcessingProgress] = useState(0);
+  const [processedEntries, setProcessedEntries] = useState(0);
+  const [totalEntries, setTotalEntries] = useState(0);
 
   const handleToggleUserMenu = () => setUserMenuOpen(v=>!v);
   const handleSignOut = async () => { setUserMenuOpen(false); await logout(); };
@@ -47,13 +60,176 @@ export default function Home(){
   const formik = useFormik({ initialValues: { files: [] }, onSubmit: (data)=>{ const formData=new FormData(); data?.files.forEach((file)=>formData.append('files',file)); imageUploadMutation.mutate(formData); } });
   const { values, setFieldValue, handleSubmit } = formik;
 
-  const onDrop = useCallback((acceptedFiles)=>{ setFieldValue('files', acceptedFiles.map(f=>Object.assign(f))); }, [setFieldValue]);
-  const { getRootProps, getInputProps } = useDropzone({ onDrop, multiple: true });
-  const dirInputRef = useRef(null);
-  const handleDirChange = (e) => {
-    const files = Array.from(e.target.files || []);
-    setFieldValue('files', files.map(f=>Object.assign(f)));
+  const zipInputRef = useRef(null);
+
+  const uploadArchiveWithProgress = (formData, token, onProgress) => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', 'http://127.0.0.1:8000/server/api/upload.php');
+      xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable) return;
+        const percent = Math.min(100, Math.round((event.loaded / event.total) * 100));
+        onProgress(percent);
+      };
+
+      xhr.onload = () => {
+        try {
+          const data = JSON.parse(xhr.responseText || '{}');
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(data);
+          } else {
+            reject(new Error(data?.error || 'Upload failed'));
+          }
+        } catch (err) {
+          reject(new Error('Invalid server response'));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error('Network error while uploading ZIP'));
+      xhr.send(formData);
+    });
   };
+
+  const processZipBatch = async (sessionId, token) => {
+    const formData = new FormData();
+    formData.append('sessionId', sessionId);
+    formData.append('batchSize', '300');
+
+    const res = await fetch('http://127.0.0.1:8000/server/api/process_zip.php', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: formData
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data?.error || 'Processing failed');
+    }
+    return data;
+  };
+
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const imageExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
+
+  const inspectZip = async (zipFile) => {
+    const zip = await JSZip.loadAsync(zipFile);
+    let count = 0;
+    Object.values(zip.files).forEach((entry) => {
+      if (entry.dir) return;
+      const ext = (entry.name.split('.').pop() || '').toLowerCase();
+      if (imageExt.includes(ext)) count++;
+    });
+    return count;
+  };
+  
+  const handleZipChange = async (e) => {
+    const zipFile = (e.target.files || [])[0];
+
+    // Do not keep all files in React state to avoid UI lag with large folders
+    setFieldValue('files', []);
+    setAnalysis([]);
+    setUploadCount(0);
+    setUploadArchiveName('');
+    setUploadArchiveSize(0);
+    setSelectedZipFile(null);
+    setSelectedZipImageCount(0);
+    setUploadError('');
+    setAnalysisDone(false);
+    setUploadProgress(0);
+    setProcessingProgress(0);
+    setProcessedEntries(0);
+    setTotalEntries(0);
+
+    if (!zipFile) {
+      setUploadError('No ZIP file selected.');
+      return;
+    }
+
+    if (!zipFile.name.toLowerCase().endsWith('.zip')) {
+      setUploadError('Please select a .zip file.');
+      return;
+    }
+
+    try {
+      setInspectingZip(true);
+      const localCount = await inspectZip(zipFile);
+      setSelectedZipFile(zipFile);
+      setSelectedZipImageCount(localCount);
+      setUploadArchiveName(zipFile.name);
+      setUploadArchiveSize(zipFile.size);
+    } catch (err) {
+      console.warn('ZIP inspect error:', err);
+      setUploadError('Could not read ZIP file. Please check the file and try again.');
+    } finally {
+      setInspectingZip(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleAnalyzeZip = async () => {
+    if (!selectedZipFile) {
+      setUploadError('Please select a ZIP file first.');
+      return;
+    }
+
+    setUploadError('');
+    setAnalysisDone(false);
+    setUploadProgress(0);
+    setProcessingProgress(0);
+    setProcessedEntries(0);
+    setTotalEntries(0);
+    setUploadCount(0);
+
+    try {
+      setUploadingZip(true);
+      const token = localStorage.getItem('auth_token');
+      const formData = new FormData();
+      formData.append('archive', selectedZipFile);
+
+      const data = await uploadArchiveWithProgress(formData, token, (percent) => {
+        setUploadProgress(percent);
+      });
+
+      if (!data.success) {
+        throw new Error(data?.error || 'Upload failed');
+      }
+
+      setUploadArchiveName(data.archiveName || selectedZipFile.name);
+      setUploadArchiveSize(Number(data.archiveSize || selectedZipFile.size));
+      setUploadProgress(100);
+
+      const sessionId = data.sessionId;
+      if (!sessionId) {
+        throw new Error('Missing processing session');
+      }
+
+      setProcessingZip(true);
+      while (true) {
+        const progressData = await processZipBatch(sessionId, token);
+        setProcessingProgress(Number(progressData.progress || 0));
+        setProcessedEntries(Number(progressData.processedEntries || 0));
+        setTotalEntries(Number(progressData.totalEntries || 0));
+        setUploadCount(Number(progressData.imageCount || 0));
+
+        if (progressData.status === 'done') {
+          setProcessingProgress(100);
+          setAnalysisDone(true);
+          break;
+        }
+        await wait(250);
+      }
+    } catch (err) {
+      console.warn('Backend upload error:', err);
+      setUploadError(err?.message || 'Upload failed');
+    } finally {
+      setUploadingZip(false);
+      setProcessingZip(false);
+    }
+  };
+
+  const handleDropzoneClick = () => zipInputRef.current?.click();
 
   const handleRemoveFile = (file) => { const uploadedFiles = values?.files || []; const filtered = uploadedFiles.filter((i)=>i.name!==file.name); setFieldValue('files',[...filtered]); setAnalysis(prev=>prev.filter(a=>a.file.name!==file.name)); };
   const handleRemoveAllFiles = () => { setFieldValue('files',[]); setAnalysis([]); };
@@ -111,16 +287,44 @@ export default function Home(){
         <h1 className="title">Ai based photo selector & analyzer</h1>
         <FormikProvider value={formik}>
           <form onSubmit={handleSubmit} className="app-form">
-            <div {...getRootProps({ className: 'dropzone' })} className="dropzone">
-              <input {...getInputProps({ multiple: true })} />
-              <input ref={dirInputRef} type="file" style={{display:'none'}} webkitdirectory="true" directory="" multiple onChange={handleDirChange} />
+            <div className="dropzone" onClick={handleDropzoneClick} style={{cursor: 'pointer'}}>
+              <input ref={zipInputRef} type="file" style={{display:'none'}} accept=".zip,application/zip,application/x-zip-compressed" onChange={handleZipChange} />
               <div className="dropzone-inner">
                 <Icon icon="lucide:upload" className="upload-icon" />
-                <p className="upload-text"><span className="upload-text" style={{color:'#eb2553'}}>Click to upload folder(s)</span> or drag and drop</p>
-                <button type="button" onClick={()=>dirInputRef.current && dirInputRef.current.click()} className="select-folder-btn">Select folder</button>
-                <p className="muted">You can remove files after analysis or export selected.</p>
+                <p className="upload-text"><span className="upload-text" style={{color:'#eb2553'}}>Click to upload ZIP</span> or drag and drop</p>
+                <p className="muted">Select a .zip file that contains your images.</p>
               </div>
             </div>
+
+            {(inspectingZip || selectedZipFile) && (
+              <div style={{marginTop: '1rem', padding: '0.75rem', borderRadius: '0.375rem', backgroundColor: '#F8FAFC', border: '1px solid #CBD5E1'}}>
+                {inspectingZip && <p style={{margin: 0, fontSize: '0.9rem', color: '#334155'}}><strong>Reading ZIP file...</strong></p>}
+                {!inspectingZip && selectedZipFile && (
+                  <>
+                    <p style={{margin: 0, fontSize: '0.9rem', color: '#0F172A'}}><strong>ZIP ready:</strong> {selectedZipFile.name}</p>
+                    <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#334155'}}>Estimated images in ZIP: <strong>{selectedZipImageCount}</strong></p>
+                    <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#334155'}}>ZIP size: <strong>{(selectedZipFile.size / (1024 * 1024)).toFixed(2)} MB</strong></p>
+                  </>
+                )}
+              </div>
+            )}
+
+            {(uploadingZip || processingZip || uploadError || analysisDone) && (
+              <div style={{marginTop: '1rem', padding: '0.75rem', borderRadius: '0.375rem', backgroundColor: uploadError ? '#FEF2F2' : '#E0F2FE', border: uploadError ? '1px solid #EF4444' : '1px solid #0284C7'}}>
+                {uploadingZip && <p style={{margin: 0, fontSize: '0.9rem', color: '#0C4A6E'}}><strong>Uploading ZIP...</strong></p>}
+                {uploadingZip && <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#0C4A6E'}}>Upload: <strong>{uploadProgress}%</strong></p>}
+                {processingZip && <p style={{margin: '0.35rem 0 0', fontSize: '0.9rem', color: '#0C4A6E'}}><strong>Processing ZIP on server...</strong></p>}
+                {processingZip && <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#0C4A6E'}}>Processing: <strong>{processingProgress}%</strong> ({processedEntries}/{totalEntries} entries)</p>}
+                {!uploadingZip && uploadError && <p style={{margin: 0, fontSize: '0.9rem', color: '#991B1B'}}><strong>Upload failed:</strong> {uploadError}</p>}
+                {!uploadingZip && !processingZip && analysisDone && uploadArchiveName && (
+                  <>
+                    <p style={{margin: 0, fontSize: '0.9rem', color: '#0C4A6E'}}><strong>{uploadCount} images</strong> found in ZIP and stored on server ✓</p>
+                    <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#0C4A6E'}}>Archive: <strong>{uploadArchiveName}</strong></p>
+                    <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#0C4A6E'}}>ZIP size: <strong>{(uploadArchiveSize / (1024 * 1024)).toFixed(2)} MB</strong></p>
+                  </>
+                )}
+              </div>
+            )}
 
             {values?.files.length ? (
               <>
@@ -168,13 +372,10 @@ export default function Home(){
               <label><input id="detectBlur" defaultChecked type="checkbox" style={{marginLeft:8}}/> Detect blurry</label>
               <label><input id="detectLight" defaultChecked type="checkbox" style={{marginLeft:8}}/> Detect bad lighting</label>
               <div className="controls-center">
-                <button type="button" onClick={analyze} className="btn btn-blue">Run Analysis</button>
+                <button type="button" onClick={handleAnalyzeZip} disabled={!selectedZipFile || inspectingZip || uploadingZip || processingZip} className="btn btn-blue">Run Analysis</button>
               </div>
             </div>
 
-            <div className="submit-area">
-              <button type="submit" className="submit-btn">Upload</button>
-            </div>
           </form>
         </FormikProvider>
       </div>
