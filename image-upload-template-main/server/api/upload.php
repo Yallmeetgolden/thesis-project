@@ -106,10 +106,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archive'])) {
         exit;
     }
 
-    $maxZipBytes = 200 * 1024 * 1024;
+    $maxZipBytes = 1024 * 1024 * 1024;
     if (($archive['size'] ?? 0) > $maxZipBytes) {
         http_response_code(413);
-        echo json_encode(['error' => 'ZIP archive is too large (max 200MB)']);
+        echo json_encode(['error' => 'ZIP archive is too large (max 1GB)']);
         exit;
     }
 
@@ -150,7 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archive'])) {
     ]);
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['files'])) {
     $files = $_FILES['files'];
-    $imageExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
+    $imageExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'nef', 'dng', 'cr2'];
     
     $count = is_array($files['name']) ? count($files['name']) : 1;
     

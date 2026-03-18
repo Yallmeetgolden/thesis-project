@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { FormikProvider, useFormik } from 'formik';
 import { Icon } from '@iconify/react';
 import JSZip from 'jszip';
@@ -53,6 +53,20 @@ export default function Home(){
   const [processingProgress, setProcessingProgress] = useState(0);
   const [processedEntries, setProcessedEntries] = useState(0);
   const [totalEntries, setTotalEntries] = useState(0);
+  const [analysisSessionId, setAnalysisSessionId] = useState('');
+  const [analyzingBlur, setAnalyzingBlur] = useState(false);
+  const [blurResult, setBlurResult] = useState(null);
+  const [detectBlurEnabled, setDetectBlurEnabled] = useState(false);
+  const [showBlurThresholdPopup, setShowBlurThresholdPopup] = useState(false);
+  const [blurQualityMode, setBlurQualityMode] = useState('acceptable');
+  const [pendingBlurQualityMode, setPendingBlurQualityMode] = useState('acceptable');
+
+  const qualityModeLabels = {
+    very_blurry: 'Very blurry',
+    slightly_blurry: 'Slightly blurry',
+    acceptable: 'Acceptable',
+    very_sharp: 'Very sharp'
+  };
 
   const handleToggleUserMenu = () => setUserMenuOpen(v=>!v);
   const handleSignOut = async () => { setUserMenuOpen(false); await logout(); };
@@ -75,16 +89,41 @@ export default function Home(){
       };
 
       xhr.onload = () => {
+        const raw = xhr.responseText || '';
+        let data = null;
+
         try {
-          const data = JSON.parse(xhr.responseText || '{}');
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(data);
-          } else {
-            reject(new Error(data?.error || 'Upload failed'));
-          }
+          data = raw ? JSON.parse(raw) : null;
         } catch (err) {
-          reject(new Error('Invalid server response'));
+          data = null;
         }
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+          if (data && typeof data === 'object') {
+            resolve(data);
+            return;
+          }
+
+          const snippet = raw.trim().slice(0, 140);
+          if (raw.includes('POST Content-Length') && raw.includes('exceeds the limit')) {
+            reject(new Error('Upload is larger than PHP server limit (default ~8MB). Restart PHP with higher upload limits: php -d upload_max_filesize=1024M -d post_max_size=1024M -S 127.0.0.1:8000 router.php'));
+            return;
+          }
+          reject(new Error(`Server returned non-JSON response (status ${xhr.status}). Check PHP server path/router. ${snippet ? 'Response: ' + snippet : ''}`));
+          return;
+        }
+
+        if (data && data.error) {
+          reject(new Error(data.error));
+          return;
+        }
+
+        const snippet = raw.trim().slice(0, 140);
+        if (raw.includes('POST Content-Length') && raw.includes('exceeds the limit')) {
+          reject(new Error('Upload is larger than PHP server limit (default ~8MB). Restart PHP with higher upload limits: php -d upload_max_filesize=1024M -d post_max_size=1024M -S 127.0.0.1:8000 router.php'));
+          return;
+        }
+        reject(new Error(`Upload failed (status ${xhr.status}). ${snippet ? 'Response: ' + snippet : ''}`));
       };
 
       xhr.onerror = () => reject(new Error('Network error while uploading ZIP'));
@@ -110,8 +149,27 @@ export default function Home(){
     return data;
   };
 
+  const analyzeBlurBatch = async (sessionId, token, qualityMode = 'acceptable') => {
+    const formData = new FormData();
+    formData.append('sessionId', sessionId);
+    formData.append('qualityMode', qualityMode);
+
+    const res = await fetch('http://127.0.0.1:8000/server/api/analyze_blur.php', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: formData
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data?.error || 'Blur analysis failed');
+    }
+    return data;
+  };
+
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  const imageExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
+  const imageExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'nef', 'dng', 'cr2'];
+  const maxZipBytes = 1024 * 1024 * 1024;
 
   const inspectZip = async (zipFile) => {
     const zip = await JSZip.loadAsync(zipFile);
@@ -141,6 +199,9 @@ export default function Home(){
     setProcessingProgress(0);
     setProcessedEntries(0);
     setTotalEntries(0);
+    setAnalysisSessionId('');
+    setAnalyzingBlur(false);
+    setBlurResult(null);
 
     if (!zipFile) {
       setUploadError('No ZIP file selected.');
@@ -149,6 +210,11 @@ export default function Home(){
 
     if (!zipFile.name.toLowerCase().endsWith('.zip')) {
       setUploadError('Please select a .zip file.');
+      return;
+    }
+
+    if (zipFile.size > maxZipBytes) {
+      setUploadError('ZIP is too large. Maximum allowed size is 1GB.');
       return;
     }
 
@@ -168,7 +234,7 @@ export default function Home(){
     }
   };
 
-  const handleAnalyzeZip = async () => {
+  const runZipAnalysis = async () => {
     if (!selectedZipFile) {
       setUploadError('Please select a ZIP file first.');
       return;
@@ -181,6 +247,8 @@ export default function Home(){
     setProcessedEntries(0);
     setTotalEntries(0);
     setUploadCount(0);
+    setBlurResult(null);
+    setAnalyzingBlur(false);
 
     try {
       setUploadingZip(true);
@@ -204,6 +272,7 @@ export default function Home(){
       if (!sessionId) {
         throw new Error('Missing processing session');
       }
+      setAnalysisSessionId(sessionId);
 
       setProcessingZip(true);
       while (true) {
@@ -215,18 +284,56 @@ export default function Home(){
 
         if (progressData.status === 'done') {
           setProcessingProgress(100);
-          setAnalysisDone(true);
           break;
         }
         await wait(250);
       }
+
+      if (detectBlurEnabled) {
+        setAnalyzingBlur(true);
+        const blurData = await analyzeBlurBatch(sessionId, token, blurQualityMode);
+        setBlurResult(blurData);
+      }
+
+      setAnalysisDone(true);
     } catch (err) {
       console.warn('Backend upload error:', err);
       setUploadError(err?.message || 'Upload failed');
     } finally {
       setUploadingZip(false);
       setProcessingZip(false);
+      setAnalyzingBlur(false);
     }
+  };
+
+  const handleAnalyzeZip = async () => {
+    if (!selectedZipFile) {
+      setUploadError('Please select a ZIP file first.');
+      return;
+    }
+
+    await runZipAnalysis();
+  };
+
+  const handleConfirmBlurThreshold = async () => {
+    setBlurQualityMode(pendingBlurQualityMode);
+    setDetectBlurEnabled(true);
+    setShowBlurThresholdPopup(false);
+  };
+
+  const handleCancelBlurThreshold = () => {
+    setShowBlurThresholdPopup(false);
+    setDetectBlurEnabled(false);
+  };
+
+  const handleDetectBlurChange = (checked) => {
+    if (checked) {
+      setPendingBlurQualityMode(blurQualityMode);
+      setShowBlurThresholdPopup(true);
+      return;
+    }
+
+    setDetectBlurEnabled(false);
   };
 
   const handleDropzoneClick = () => zipInputRef.current?.click();
@@ -263,6 +370,15 @@ export default function Home(){
   const exportSelected = async ()=>{ const selected = analysis.filter(a=>a.selected); if(!selected.length){ alert('No selected files'); return; } const zip = new JSZip(); for(const it of selected){ const buf = await it.file.arrayBuffer(); zip.file(it.file.name, buf); } const blob = await zip.generateAsync({type:'blob'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='selected_images.zip'; document.body.appendChild(a); a.click(); a.remove(); };
 
   const renderPreview = (file)=> file.type.startsWith('image') ? <img className="h-10 w-10" alt={file.name} src={URL.createObjectURL(file)} /> : <Icon icon="tabler:file-description" className="w-8" />;
+  const selectedScoreByName = useMemo(() => {
+    const map = new Map();
+    if (Array.isArray(blurResult?.selectedFileScores)) {
+      blurResult.selectedFileScores.forEach((item) => {
+        if (item?.filename) map.set(item.filename, item);
+      });
+    }
+    return map;
+  }, [blurResult]);
 
   return (
     <div className="app-root">
@@ -309,18 +425,52 @@ export default function Home(){
               </div>
             )}
 
-            {(uploadingZip || processingZip || uploadError || analysisDone) && (
+            {(uploadingZip || processingZip || analyzingBlur || uploadError || analysisDone) && (
               <div style={{marginTop: '1rem', padding: '0.75rem', borderRadius: '0.375rem', backgroundColor: uploadError ? '#FEF2F2' : '#E0F2FE', border: uploadError ? '1px solid #EF4444' : '1px solid #0284C7'}}>
                 {uploadingZip && <p style={{margin: 0, fontSize: '0.9rem', color: '#0C4A6E'}}><strong>Uploading ZIP...</strong></p>}
                 {uploadingZip && <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#0C4A6E'}}>Upload: <strong>{uploadProgress}%</strong></p>}
                 {processingZip && <p style={{margin: '0.35rem 0 0', fontSize: '0.9rem', color: '#0C4A6E'}}><strong>Processing ZIP on server...</strong></p>}
                 {processingZip && <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#0C4A6E'}}>Processing: <strong>{processingProgress}%</strong> ({processedEntries}/{totalEntries} entries)</p>}
+                {analyzingBlur && <p style={{margin: '0.35rem 0 0', fontSize: '0.9rem', color: '#0C4A6E'}}><strong>Analyzing blurry images...</strong></p>}
                 {!uploadingZip && uploadError && <p style={{margin: 0, fontSize: '0.9rem', color: '#991B1B'}}><strong>Upload failed:</strong> {uploadError}</p>}
-                {!uploadingZip && !processingZip && analysisDone && uploadArchiveName && (
+                {!uploadingZip && !processingZip && !analyzingBlur && analysisDone && uploadArchiveName && (
                   <>
                     <p style={{margin: 0, fontSize: '0.9rem', color: '#0C4A6E'}}><strong>{uploadCount} images</strong> found in ZIP and stored on server ✓</p>
                     <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#0C4A6E'}}>Archive: <strong>{uploadArchiveName}</strong></p>
                     <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#0C4A6E'}}>ZIP size: <strong>{(uploadArchiveSize / (1024 * 1024)).toFixed(2)} MB</strong></p>
+                    {!!analysisSessionId && <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#0C4A6E'}}>Session: <strong>{analysisSessionId}</strong></p>}
+                    {blurResult && (
+                      <>
+                        <p style={{margin: '0.5rem 0 0', fontSize: '0.9rem', color: '#0C4A6E'}}>
+                          Selected ({qualityModeLabels[blurResult.qualityMode] || 'Result'}): <strong>{Number(blurResult.selectedCount || 0)}</strong> / {Number(blurResult.analyzedCount || 0)}
+                        </p>
+                        {blurResult?.buckets && (
+                          <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#0C4A6E'}}>
+                            Very blurry: <strong>{Number(blurResult.buckets['Very blurry'] || 0)}</strong> · Slightly blurry: <strong>{Number(blurResult.buckets['Slightly blurry'] || 0)}</strong> · Acceptable: <strong>{Number(blurResult.buckets['Acceptable'] || 0)}</strong> · Very sharp: <strong>{Number(blurResult.buckets['Very sharp'] || 0)}</strong>
+                          </p>
+                        )}
+                        <div style={{marginTop: '0.5rem', maxHeight: '200px', overflowY: 'auto', backgroundColor: '#F8FAFC', border: '1px solid #BAE6FD', borderRadius: '0.375rem', padding: '0.5rem'}}>
+                          {Array.isArray(blurResult.selectedFiles) && blurResult.selectedFiles.length > 0 ? (
+                            blurResult.selectedFiles.map((name) => {
+                              const scoreItem = selectedScoreByName.get(name);
+                              return (
+                                <div key={name} style={{fontSize: '0.8rem', color: '#0F172A', padding: '0.15rem 0'}}>
+                                  • {name}
+                                  {scoreItem ? ` (blur: ${scoreItem.blurScore}, raw: ${scoreItem.rawSharpness})` : ''}
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div style={{fontSize: '0.8rem', color: '#0F172A'}}>No images matched selected quality.</div>
+                          )}
+                        </div>
+                        {blurResult?.calibration && (
+                          <p style={{margin: '0.45rem 0 0', fontSize: '0.78rem', color: '#0C4A6E'}}>
+                            Auto calibration — Laplacian p10: <strong>{Number(blurResult.calibration.laplacianP10 || 0).toFixed(2)}</strong>, p90: <strong>{Number(blurResult.calibration.laplacianP90 || 0).toFixed(2)}</strong>
+                          </p>
+                        )}
+                      </>
+                    )}
                   </>
                 )}
               </div>
@@ -369,12 +519,48 @@ export default function Home(){
               <button type="button" onClick={selectTop} className="btn btn-black">Select Top</button>
               <button type="button" onClick={exportSelected} className="btn btn-black">Export Selected (ZIP)</button>
               <label><input id="detectDuplicates" defaultChecked type="checkbox" style={{marginLeft:8}}/> Detect duplicates</label>
-              <label><input id="detectBlur" defaultChecked type="checkbox" style={{marginLeft:8}}/> Detect blurry</label>
+              <label>
+                <input
+                  id="detectBlur"
+                  type="checkbox"
+                  style={{marginLeft:8}}
+                  checked={detectBlurEnabled}
+                  onChange={(e) => handleDetectBlurChange(e.target.checked)}
+                /> Detect blurry
+              </label>
               <label><input id="detectLight" defaultChecked type="checkbox" style={{marginLeft:8}}/> Detect bad lighting</label>
               <div className="controls-center">
-                <button type="button" onClick={handleAnalyzeZip} disabled={!selectedZipFile || inspectingZip || uploadingZip || processingZip} className="btn btn-blue">Run Analysis</button>
+                <button type="button" onClick={handleAnalyzeZip} disabled={!selectedZipFile || inspectingZip || uploadingZip || processingZip || analyzingBlur} className="btn btn-blue">Run Analysis</button>
               </div>
             </div>
+
+            {showBlurThresholdPopup && (
+              <div style={{position:'fixed', inset:0, backgroundColor:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000}}>
+                <div style={{background:'#fff', borderRadius:'0.5rem', padding:'1rem', width:'min(90vw, 360px)', boxShadow:'0 10px 30px rgba(0,0,0,0.2)'}}>
+                  <p style={{margin:'0 0 0.6rem', fontWeight:600, color:'#0F172A'}}>Choose quality range</p>
+                  <label style={{display:'block', marginBottom:'0.6rem', color:'#0F172A', fontSize:'0.85rem'}}>
+                    Select quality to list:
+                    <select
+                      value={pendingBlurQualityMode}
+                      onChange={(e) => setPendingBlurQualityMode(e.target.value)}
+                      style={{display:'block', width:'100%', marginTop:'0.3rem', padding:'0.35rem', border:'1px solid #CBD5E1', borderRadius:'0.35rem'}}
+                    >
+                      <option value="very_blurry">Very blurry (0–50)</option>
+                      <option value="slightly_blurry">Slightly blurry</option>
+                      <option value="acceptable">Acceptable (100–300)</option>
+                      <option value="very_sharp">Very sharp (300+)</option>
+                    </select>
+                  </label>
+                  <p style={{margin:'0.2rem 0 0.8rem', fontSize:'0.82rem', color:'#334155'}}>
+                    Quality is auto-calibrated per ZIP using blur score (0 = sharpest, 100 = blurriest).
+                  </p>
+                  <div style={{display:'flex', justifyContent:'flex-end', gap:'0.5rem'}}>
+                    <button type="button" className="btn btn-black" onClick={handleCancelBlurThreshold}>Cancel</button>
+                    <button type="button" className="btn btn-blue" onClick={handleConfirmBlurThreshold}>OK</button>
+                  </div>
+                </div>
+              </div>
+            )}
 
           </form>
         </FormikProvider>

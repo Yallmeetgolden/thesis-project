@@ -99,7 +99,7 @@ if ($zip->open($archivePath) !== true) {
     exit;
 }
 
-$imageExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
+$imageExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'nef', 'dng', 'cr2'];
 $maxImages = 20000;
 $maxTotalUncompressed = 1024 * 1024 * 1024;
 
