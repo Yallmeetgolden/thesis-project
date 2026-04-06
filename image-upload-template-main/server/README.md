@@ -20,6 +20,7 @@ Frontend expects API at `http://localhost:8000/server/api`.
    python python_service/app.py
 
 Python service runs on `http://127.0.0.1:8001` by default.
+For professional-level accuracy, add TorchScript model at `python_service/models/blur_classifier.pt`.
 
 OAuth has been removed from this project. Use the provided email/password endpoints:
 - `server/api/register.php` — register (POST JSON {email,password})

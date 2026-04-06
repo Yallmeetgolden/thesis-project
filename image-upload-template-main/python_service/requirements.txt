@@ -3,3 +3,5 @@ uvicorn==0.30.6
 opencv-python-headless==4.10.0.84
 numpy==2.1.1
 rawpy==0.22.0
+torch==2.5.1
+torchvision==0.20.1

@@ -67,7 +67,9 @@ if (!$serviceUrl) {
 
 $requestBody = json_encode([
     'imagesDir' => $imagesDir,
-    'qualityMode' => $qualityMode
+    'qualityMode' => $qualityMode,
+    'useDeepLearning' => true,
+    'deepLearningWeight' => 0.65
 ]);
 
 $ch = curl_init($serviceUrl);

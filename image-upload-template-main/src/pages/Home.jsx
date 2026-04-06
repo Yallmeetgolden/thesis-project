@@ -466,7 +466,7 @@ export default function Home(){
                         </div>
                         {blurResult?.calibration && (
                           <p style={{margin: '0.45rem 0 0', fontSize: '0.78rem', color: '#0C4A6E'}}>
-                            Auto calibration — Laplacian p10: <strong>{Number(blurResult.calibration.laplacianP10 || 0).toFixed(2)}</strong>, p90: <strong>{Number(blurResult.calibration.laplacianP90 || 0).toFixed(2)}</strong>
+                            Auto calibration — mode: <strong>{String(blurResult.calibration.modelUsed || 'classical')}</strong>, status: <strong>{String(blurResult.calibration.modelStatus || 'unknown')}</strong> · mean sharpness: <strong>{Number(blurResult.calibration.meanSharpnessScore || 0).toFixed(2)}</strong>, dynamic threshold: <strong>{Number(blurResult.calibration.dynamicSharpnessThreshold || 0).toFixed(2)}</strong> · Laplacian p10: <strong>{Number(blurResult.calibration.laplacianP10 || 0).toFixed(2)}</strong>, p90: <strong>{Number(blurResult.calibration.laplacianP90 || 0).toFixed(2)}</strong>
                           </p>
                         )}
                       </>
