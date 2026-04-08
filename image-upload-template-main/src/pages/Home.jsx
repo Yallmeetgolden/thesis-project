@@ -55,7 +55,10 @@ export default function Home(){
   const [totalEntries, setTotalEntries] = useState(0);
   const [analysisSessionId, setAnalysisSessionId] = useState('');
   const [analyzingBlur, setAnalyzingBlur] = useState(false);
+  const [analyzingDuplicates, setAnalyzingDuplicates] = useState(false);
   const [blurResult, setBlurResult] = useState(null);
+  const [duplicateResult, setDuplicateResult] = useState(null);
+  const [detectDuplicatesEnabled, setDetectDuplicatesEnabled] = useState(true);
   const [detectBlurEnabled, setDetectBlurEnabled] = useState(false);
   const [showBlurThresholdPopup, setShowBlurThresholdPopup] = useState(false);
   const [blurQualityMode, setBlurQualityMode] = useState('acceptable');
@@ -167,6 +170,24 @@ export default function Home(){
     return data;
   };
 
+  const analyzeDuplicatesBatch = async (sessionId, token, threshold = 0.92) => {
+    const formData = new FormData();
+    formData.append('sessionId', sessionId);
+    formData.append('threshold', String(threshold));
+
+    const res = await fetch('http://127.0.0.1:8000/server/api/analyze_duplicates.php', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: formData
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data?.error || 'Duplicate analysis failed');
+    }
+    return data;
+  };
+
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const imageExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'nef', 'dng', 'cr2'];
   const maxZipBytes = 1024 * 1024 * 1024;
@@ -201,7 +222,9 @@ export default function Home(){
     setTotalEntries(0);
     setAnalysisSessionId('');
     setAnalyzingBlur(false);
+    setAnalyzingDuplicates(false);
     setBlurResult(null);
+    setDuplicateResult(null);
 
     if (!zipFile) {
       setUploadError('No ZIP file selected.');
@@ -248,7 +271,9 @@ export default function Home(){
     setTotalEntries(0);
     setUploadCount(0);
     setBlurResult(null);
+    setDuplicateResult(null);
     setAnalyzingBlur(false);
+    setAnalyzingDuplicates(false);
 
     try {
       setUploadingZip(true);
@@ -289,6 +314,12 @@ export default function Home(){
         await wait(250);
       }
 
+      if (detectDuplicatesEnabled) {
+        setAnalyzingDuplicates(true);
+        const duplicateData = await analyzeDuplicatesBatch(sessionId, token, 0.92);
+        setDuplicateResult(duplicateData);
+      }
+
       if (detectBlurEnabled) {
         setAnalyzingBlur(true);
         const blurData = await analyzeBlurBatch(sessionId, token, blurQualityMode);
@@ -303,6 +334,7 @@ export default function Home(){
       setUploadingZip(false);
       setProcessingZip(false);
       setAnalyzingBlur(false);
+      setAnalyzingDuplicates(false);
     }
   };
 
@@ -425,20 +457,56 @@ export default function Home(){
               </div>
             )}
 
-            {(uploadingZip || processingZip || analyzingBlur || uploadError || analysisDone) && (
+            {(uploadingZip || processingZip || analyzingBlur || analyzingDuplicates || uploadError || analysisDone) && (
               <div style={{marginTop: '1rem', padding: '0.75rem', borderRadius: '0.375rem', backgroundColor: uploadError ? '#FEF2F2' : '#E0F2FE', border: uploadError ? '1px solid #EF4444' : '1px solid #0284C7'}}>
                 {uploadingZip && <p style={{margin: 0, fontSize: '0.9rem', color: '#0C4A6E'}}><strong>Uploading ZIP...</strong></p>}
                 {uploadingZip && <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#0C4A6E'}}>Upload: <strong>{uploadProgress}%</strong></p>}
                 {processingZip && <p style={{margin: '0.35rem 0 0', fontSize: '0.9rem', color: '#0C4A6E'}}><strong>Processing ZIP on server...</strong></p>}
                 {processingZip && <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#0C4A6E'}}>Processing: <strong>{processingProgress}%</strong> ({processedEntries}/{totalEntries} entries)</p>}
+                {analyzingDuplicates && <p style={{margin: '0.35rem 0 0', fontSize: '0.9rem', color: '#0C4A6E'}}><strong>Analyzing duplicates...</strong></p>}
                 {analyzingBlur && <p style={{margin: '0.35rem 0 0', fontSize: '0.9rem', color: '#0C4A6E'}}><strong>Analyzing blurry images...</strong></p>}
                 {!uploadingZip && uploadError && <p style={{margin: 0, fontSize: '0.9rem', color: '#991B1B'}}><strong>Upload failed:</strong> {uploadError}</p>}
-                {!uploadingZip && !processingZip && !analyzingBlur && analysisDone && uploadArchiveName && (
+                {!uploadingZip && !processingZip && !analyzingBlur && !analyzingDuplicates && analysisDone && uploadArchiveName && (
                   <>
                     <p style={{margin: 0, fontSize: '0.9rem', color: '#0C4A6E'}}><strong>{uploadCount} images</strong> found in ZIP and stored on server ✓</p>
                     <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#0C4A6E'}}>Archive: <strong>{uploadArchiveName}</strong></p>
                     <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#0C4A6E'}}>ZIP size: <strong>{(uploadArchiveSize / (1024 * 1024)).toFixed(2)} MB</strong></p>
                     {!!analysisSessionId && <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#0C4A6E'}}>Session: <strong>{analysisSessionId}</strong></p>}
+                    {duplicateResult && (
+                      <>
+                        <p style={{margin: '0.5rem 0 0', fontSize: '0.9rem', color: '#0C4A6E'}}>
+                          Duplicates found: <strong>{Number(duplicateResult.duplicatesFound || 0)}</strong> / {Number(duplicateResult.analyzedCount || 0)}
+                        </p>
+                        <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#0C4A6E'}}>
+                          Groups: <strong>{Number((duplicateResult.duplicateGroups || []).length)}</strong> · Pairs: <strong>{Number((duplicateResult.duplicatePairs || []).length)}</strong> · Similarity threshold: <strong>{Number(duplicateResult.threshold || 0).toFixed(3)}</strong>
+                        </p>
+                        <div style={{marginTop: '0.5rem', maxHeight: '220px', overflowY: 'auto', backgroundColor: '#F8FAFC', border: '1px solid #BAE6FD', borderRadius: '0.375rem', padding: '0.5rem'}}>
+                          {Array.isArray(duplicateResult.duplicateGroups) && duplicateResult.duplicateGroups.length > 0 ? (
+                            duplicateResult.duplicateGroups.map((group, idx) => (
+                              <div key={`dup-group-${idx}`} style={{fontSize: '0.8rem', color: '#0F172A', padding: '0.2rem 0'}}>
+                                <div style={{fontWeight: 600, marginBottom: '0.15rem'}}>Group {idx + 1} ({Array.isArray(group) ? group.length : 0} images)</div>
+                                {Array.isArray(group) && group.map((name) => (
+                                  <div key={`${idx}-${name}`}>• {name}</div>
+                                ))}
+                              </div>
+                            ))
+                          ) : (
+                            <div style={{fontSize: '0.8rem', color: '#0F172A'}}>No duplicate groups found.</div>
+                          )}
+
+                          {Array.isArray(duplicateResult.duplicatePairs) && duplicateResult.duplicatePairs.length > 0 && (
+                            <div style={{marginTop: '0.45rem', borderTop: '1px solid #E2E8F0', paddingTop: '0.45rem'}}>
+                              <div style={{fontSize: '0.78rem', color: '#334155', fontWeight: 600, marginBottom: '0.2rem'}}>Top similar pairs</div>
+                              {duplicateResult.duplicatePairs.slice(0, 20).map((pair, idx) => (
+                                <div key={`dup-pair-${idx}`} style={{fontSize: '0.78rem', color: '#0F172A', padding: '0.12rem 0'}}>
+                                  • {pair.fileA} ↔ {pair.fileB} (sim: {Number(pair.similarity || 0).toFixed(4)})
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                     {blurResult && (
                       <>
                         <p style={{margin: '0.5rem 0 0', fontSize: '0.9rem', color: '#0C4A6E'}}>
@@ -518,7 +586,15 @@ export default function Home(){
               <label>Top results: <input id="topN" defaultValue={10} type="number" min={1} style={{width:72,marginLeft:6}}/></label>
               <button type="button" onClick={selectTop} className="btn btn-black">Select Top</button>
               <button type="button" onClick={exportSelected} className="btn btn-black">Export Selected (ZIP)</button>
-              <label><input id="detectDuplicates" defaultChecked type="checkbox" style={{marginLeft:8}}/> Detect duplicates</label>
+              <label>
+                <input
+                  id="detectDuplicates"
+                  type="checkbox"
+                  style={{marginLeft:8}}
+                  checked={detectDuplicatesEnabled}
+                  onChange={(e) => setDetectDuplicatesEnabled(e.target.checked)}
+                /> Detect duplicates
+              </label>
               <label>
                 <input
                   id="detectBlur"
@@ -530,7 +606,7 @@ export default function Home(){
               </label>
               <label><input id="detectLight" defaultChecked type="checkbox" style={{marginLeft:8}}/> Detect bad lighting</label>
               <div className="controls-center">
-                <button type="button" onClick={handleAnalyzeZip} disabled={!selectedZipFile || inspectingZip || uploadingZip || processingZip || analyzingBlur} className="btn btn-blue">Run Analysis</button>
+                <button type="button" onClick={handleAnalyzeZip} disabled={!selectedZipFile || inspectingZip || uploadingZip || processingZip || analyzingBlur || analyzingDuplicates} className="btn btn-blue">Run Analysis</button>
               </div>
             </div>
 

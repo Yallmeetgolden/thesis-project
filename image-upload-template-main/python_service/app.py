@@ -110,22 +110,21 @@ def _norm_by_percentiles(value: float, p10: float, p90: float) -> float:
 
 
 def _label_from_blur_score(score: int) -> str:
-    # Tuned boundaries based on user-provided sample categories.
-    if score > 60:
+    if score > 70:
         return "Very blurry"
-    if score > 30:
+    if score > 45:
         return "Slightly blurry"
-    if score > 8:
+    if score > 20:
         return "Acceptable"
     return "Very sharp"
 
 
 def _mode_from_blur_score(score: int) -> str:
-    if score > 60:
+    if score > 70:
         return "very_blurry"
-    if score > 30:
+    if score > 45:
         return "slightly_blurry"
-    if score > 8:
+    if score > 20:
         return "acceptable"
     return "very_sharp"
 
@@ -404,12 +403,8 @@ def analyze_folder(body: AnalyzeRequest) -> Dict[str, Any]:
             w_lap, w_ten, w_brenner = 0.40, 0.40, 0.20
 
         classical_sharpness = w_lap * lap_norm + w_ten * ten_norm + w_brenner * brenner_norm
-        noise_penalty = 1.0 - (0.12 * noise_norm)
+        noise_penalty = 1.0 - (0.18 * noise_norm)
         classical_sharpness = classical_sharpness * float(np.clip(noise_penalty, 0.70, 1.0))
-        # Preserve subject sharpness in depth-of-field scenes by boosting when gradients are strong.
-        texture_presence = (0.60 * ten_norm) + (0.40 * brenner_norm)
-        subject_boost = max(0.0, texture_presence - 0.55) * 0.18 + max(0.0, con_norm - 0.50) * 0.06
-        classical_sharpness += subject_boost
         classical_sharpness = float(np.clip(classical_sharpness, 0.0, 1.0))
 
         deep_sharp = entry.get("deepSharpProb")
