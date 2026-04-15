@@ -56,10 +56,13 @@ export default function Home(){
   const [analysisSessionId, setAnalysisSessionId] = useState('');
   const [analyzingBlur, setAnalyzingBlur] = useState(false);
   const [analyzingDuplicates, setAnalyzingDuplicates] = useState(false);
+  const [analyzingLighting, setAnalyzingLighting] = useState(false);
   const [blurResult, setBlurResult] = useState(null);
   const [duplicateResult, setDuplicateResult] = useState(null);
+  const [lightingResult, setLightingResult] = useState(null);
   const [detectDuplicatesEnabled, setDetectDuplicatesEnabled] = useState(true);
   const [detectBlurEnabled, setDetectBlurEnabled] = useState(false);
+  const [detectLightingEnabled, setDetectLightingEnabled] = useState(false);
   const [showBlurThresholdPopup, setShowBlurThresholdPopup] = useState(false);
   const [blurQualityMode, setBlurQualityMode] = useState('acceptable');
   const [pendingBlurQualityMode, setPendingBlurQualityMode] = useState('acceptable');
@@ -188,6 +191,32 @@ export default function Home(){
     return data;
   };
 
+  const analyzeLightingBatch = async (sessionId, token) => {
+    const formData = new FormData();
+    formData.append('sessionId', sessionId);
+    formData.append('minBrightness', '50');
+    formData.append('maxBrightness', '200');
+    formData.append('minContrast', '32');
+    formData.append('balanceThreshold', '40');
+    formData.append('maxBalanceRatio', '0.22');
+    formData.append('highlightLevel', '245');
+    formData.append('maxHighlightRatio', '0.08');
+    formData.append('hotspotLevel', '230');
+    formData.append('maxHotspotRatio', '0.015');
+
+    const res = await fetch('http://127.0.0.1:8000/server/api/analyze_bad_lighting.php', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: formData
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data?.error || 'Lighting analysis failed');
+    }
+    return data;
+  };
+
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const imageExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'nef', 'dng', 'cr2'];
   const maxZipBytes = 1024 * 1024 * 1024;
@@ -223,8 +252,10 @@ export default function Home(){
     setAnalysisSessionId('');
     setAnalyzingBlur(false);
     setAnalyzingDuplicates(false);
+    setAnalyzingLighting(false);
     setBlurResult(null);
     setDuplicateResult(null);
+    setLightingResult(null);
 
     if (!zipFile) {
       setUploadError('No ZIP file selected.');
@@ -272,8 +303,10 @@ export default function Home(){
     setUploadCount(0);
     setBlurResult(null);
     setDuplicateResult(null);
+    setLightingResult(null);
     setAnalyzingBlur(false);
     setAnalyzingDuplicates(false);
+    setAnalyzingLighting(false);
 
     try {
       setUploadingZip(true);
@@ -320,6 +353,12 @@ export default function Home(){
         setDuplicateResult(duplicateData);
       }
 
+      if (detectLightingEnabled) {
+        setAnalyzingLighting(true);
+        const lightingData = await analyzeLightingBatch(sessionId, token);
+        setLightingResult(lightingData);
+      }
+
       if (detectBlurEnabled) {
         setAnalyzingBlur(true);
         const blurData = await analyzeBlurBatch(sessionId, token, blurQualityMode);
@@ -335,6 +374,7 @@ export default function Home(){
       setProcessingZip(false);
       setAnalyzingBlur(false);
       setAnalyzingDuplicates(false);
+      setAnalyzingLighting(false);
     }
   };
 
@@ -386,9 +426,9 @@ export default function Home(){
     const blurThreshold = parseInt(document.getElementById('blurThreshold')?.value || '1500',10);
     const darkThreshold = parseInt(document.getElementById('darkThreshold')?.value || '60',10);
     const brightThreshold = parseInt(document.getElementById('brightThreshold')?.value || '200',10);
-    const detectBlur = document.getElementById('detectBlur')?.checked;
-    const detectLight = document.getElementById('detectLight')?.checked;
-    const detectDuplicates = document.getElementById('detectDuplicates')?.checked;
+    const detectBlur = detectBlurEnabled;
+    const detectLight = detectLightingEnabled;
+    const detectDuplicates = detectDuplicatesEnabled;
 
     for(const it of items){ const isDup = duplicates.has(it.file.name); const isBlurry = it.lapVar < blurThreshold; const badLight = (it.luminance < darkThreshold) || (it.luminance > brightThreshold); let score=0; if(detectBlur && !isBlurry) score++; if(detectLight && !badLight) score++; if(detectDuplicates && !isDup) score++; it.score=score; it.isDuplicate=isDup; it.isBlurry=isBlurry; it.badLight=badLight; }
 
@@ -457,16 +497,17 @@ export default function Home(){
               </div>
             )}
 
-            {(uploadingZip || processingZip || analyzingBlur || analyzingDuplicates || uploadError || analysisDone) && (
+            {(uploadingZip || processingZip || analyzingBlur || analyzingDuplicates || analyzingLighting || uploadError || analysisDone) && (
               <div style={{marginTop: '1rem', padding: '0.75rem', borderRadius: '0.375rem', backgroundColor: uploadError ? '#FEF2F2' : '#E0F2FE', border: uploadError ? '1px solid #EF4444' : '1px solid #0284C7'}}>
                 {uploadingZip && <p style={{margin: 0, fontSize: '0.9rem', color: '#0C4A6E'}}><strong>Uploading ZIP...</strong></p>}
                 {uploadingZip && <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#0C4A6E'}}>Upload: <strong>{uploadProgress}%</strong></p>}
                 {processingZip && <p style={{margin: '0.35rem 0 0', fontSize: '0.9rem', color: '#0C4A6E'}}><strong>Processing ZIP on server...</strong></p>}
                 {processingZip && <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#0C4A6E'}}>Processing: <strong>{processingProgress}%</strong> ({processedEntries}/{totalEntries} entries)</p>}
                 {analyzingDuplicates && <p style={{margin: '0.35rem 0 0', fontSize: '0.9rem', color: '#0C4A6E'}}><strong>Analyzing duplicates...</strong></p>}
+                {analyzingLighting && <p style={{margin: '0.35rem 0 0', fontSize: '0.9rem', color: '#0C4A6E'}}><strong>Analyzing face lighting...</strong></p>}
                 {analyzingBlur && <p style={{margin: '0.35rem 0 0', fontSize: '0.9rem', color: '#0C4A6E'}}><strong>Analyzing blurry images...</strong></p>}
                 {!uploadingZip && uploadError && <p style={{margin: 0, fontSize: '0.9rem', color: '#991B1B'}}><strong>Upload failed:</strong> {uploadError}</p>}
-                {!uploadingZip && !processingZip && !analyzingBlur && !analyzingDuplicates && analysisDone && uploadArchiveName && (
+                {!uploadingZip && !processingZip && !analyzingBlur && !analyzingDuplicates && !analyzingLighting && analysisDone && uploadArchiveName && (
                   <>
                     <p style={{margin: 0, fontSize: '0.9rem', color: '#0C4A6E'}}><strong>{uploadCount} images</strong> found in ZIP and stored on server ✓</p>
                     <p style={{margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#0C4A6E'}}>Archive: <strong>{uploadArchiveName}</strong></p>
@@ -539,6 +580,53 @@ export default function Home(){
                         )}
                       </>
                     )}
+                    {lightingResult && (
+                      <>
+                        <p style={{margin: '0.5rem 0 0', fontSize: '0.9rem', color: '#0C4A6E'}}>
+                          Lighting analysis: <strong>{Number(lightingResult.goodLightingCount || 0)}</strong> good / <strong>{Number(lightingResult.badLightingCount || 0)}</strong> bad lighting
+                        </p>
+                        {lightingResult?.reasonCounts && (
+                          <p style={{margin: '0.35rem 0 0', fontSize: '0.75rem', color: '#0C4A6E'}}>
+                            Issues — too dark: <strong>{lightingResult.reasonCounts.too_dark || 0}</strong> · too bright: <strong>{lightingResult.reasonCounts.too_bright_washed_out || 0}</strong> · low contrast: <strong>{lightingResult.reasonCounts.low_contrast || 0}</strong> · unbalanced: <strong>{lightingResult.reasonCounts.unbalanced_lighting || 0}</strong>
+                          </p>
+                        )}
+                        {lightingResult?.thresholds && (
+                          <p style={{margin: '0.2rem 0 0', fontSize: '0.7rem', color: '#334155'}}>
+                            Thresholds: brightness [{lightingResult.thresholds.min_brightness}-{lightingResult.thresholds.max_brightness}], contrast &gt;{lightingResult.thresholds.min_contrast}, balance &lt;{lightingResult.thresholds.balance_threshold}
+                          </p>
+                        )}
+                        {Array.isArray(lightingResult.badLightingFiles) && lightingResult.badLightingFiles.length > 0 && (
+                          <div style={{marginTop: '0.4rem'}}>
+                            <div style={{fontSize: '0.75rem', fontWeight: 600, color: '#0C4A6E', marginBottom: '0.2rem'}}>Bad lighting files:</div>
+                            <div style={{marginTop: '0.3rem', maxHeight: '180px', overflowY: 'auto', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '0.375rem', padding: '0.4rem'}}>
+                              {lightingResult.badLightingFiles.map((file) => (
+                                <div key={file.filename} style={{fontSize: '0.72rem', color: '#7F1D1D', padding: '0.1rem 0', marginBottom: '0.15rem', borderBottom: '1px solid #FCA5A5'}}>
+                                  <div><strong>✗ {file.filename}</strong></div>
+                                  <div style={{marginLeft: '0.4rem', fontSize: '0.7rem', color: '#991B1B'}}>
+                                    brightness: {file.brightness} | contrast: {file.contrast} | L/R: {file.left_brightness}/{file.right_brightness} (diff: {file.balance_diff})
+                                  </div>
+                                  {file.reasons && file.reasons.length > 0 && (
+                                    <div style={{marginLeft: '0.4rem', fontSize: '0.65rem', color: '#DC2626', fontStyle: 'italic'}}>
+                                      Issues: {file.reasons.join(', ')}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {Array.isArray(lightingResult.goodLightingFiles) && lightingResult.goodLightingFiles.length > 0 && (
+                          <div style={{marginTop: '0.4rem'}}>
+                            <div style={{fontSize: '0.75rem', fontWeight: 600, color: '#0C4A6E', marginBottom: '0.2rem'}}>Good lighting files ({lightingResult.goodLightingFiles.length}):</div>
+                            <div style={{marginTop: '0.3rem', maxHeight: '140px', overflowY: 'auto', backgroundColor: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: '0.375rem', padding: '0.4rem', fontSize: '0.7rem', color: '#15803D'}}>
+                              {lightingResult.goodLightingFiles.map((file) => (
+                                <div key={file.filename}>✓ {file.filename} (b: {file.brightness}, c: {file.contrast})</div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </>
                 )}
               </div>
@@ -604,9 +692,17 @@ export default function Home(){
                   onChange={(e) => handleDetectBlurChange(e.target.checked)}
                 /> Detect blurry
               </label>
-              <label><input id="detectLight" defaultChecked type="checkbox" style={{marginLeft:8}}/> Detect bad lighting</label>
+              <label>
+                <input
+                  id="detectLighting"
+                  type="checkbox"
+                  style={{marginLeft:8}}
+                  checked={detectLightingEnabled}
+                  onChange={(e) => setDetectLightingEnabled(e.target.checked)}
+                /> Detect bad lighting (face)
+              </label>
               <div className="controls-center">
-                <button type="button" onClick={handleAnalyzeZip} disabled={!selectedZipFile || inspectingZip || uploadingZip || processingZip || analyzingBlur || analyzingDuplicates} className="btn btn-blue">Run Analysis</button>
+                <button type="button" onClick={handleAnalyzeZip} disabled={!selectedZipFile || inspectingZip || uploadingZip || processingZip || analyzingBlur || analyzingDuplicates || analyzingLighting} className="btn btn-blue">Run Analysis</button>
               </div>
             </div>
 
