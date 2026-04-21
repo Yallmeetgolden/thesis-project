@@ -62,13 +62,9 @@ if (!$scriptPath || !file_exists($scriptPath)) {
 set_time_limit(0);
 $minBrightness = (!empty($_POST['minBrightness']) ? (float)$_POST['minBrightness'] : 50.0);
 $maxBrightness = (!empty($_POST['maxBrightness']) ? (float)$_POST['maxBrightness'] : 200.0);
-$minContrast = (!empty($_POST['minContrast']) ? (float)$_POST['minContrast'] : 32.0);
+$minContrast = (!empty($_POST['minContrast']) ? (float)$_POST['minContrast'] : 40.0);
 $balanceThreshold = (!empty($_POST['balanceThreshold']) ? (float)$_POST['balanceThreshold'] : 40.0);
-$maxBalanceRatio = (!empty($_POST['maxBalanceRatio']) ? (float)$_POST['maxBalanceRatio'] : 0.22);
-$highlightLevel = (!empty($_POST['highlightLevel']) ? (float)$_POST['highlightLevel'] : 245.0);
-$maxHighlightRatio = (!empty($_POST['maxHighlightRatio']) ? (float)$_POST['maxHighlightRatio'] : 0.08);
-$hotspotLevel = (!empty($_POST['hotspotLevel']) ? (float)$_POST['hotspotLevel'] : 230.0);
-$maxHotspotRatio = (!empty($_POST['maxHotspotRatio']) ? (float)$_POST['maxHotspotRatio'] : 0.015);
+$maxBalanceRatio = (!empty($_POST['maxBalanceRatio']) ? (float)$_POST['maxBalanceRatio'] : 0.95);
 
 $cmd = escapeshellcmd($pythonBin)
     . ' ' . escapeshellarg($scriptPath)
@@ -77,11 +73,7 @@ $cmd = escapeshellcmd($pythonBin)
     . ' --maxBrightness ' . escapeshellarg((string)$maxBrightness)
     . ' --minContrast ' . escapeshellarg((string)$minContrast)
     . ' --balanceThreshold ' . escapeshellarg((string)$balanceThreshold)
-    . ' --maxBalanceRatio ' . escapeshellarg((string)$maxBalanceRatio)
-    . ' --highlightLevel ' . escapeshellarg((string)$highlightLevel)
-    . ' --maxHighlightRatio ' . escapeshellarg((string)$maxHighlightRatio)
-    . ' --hotspotLevel ' . escapeshellarg((string)$hotspotLevel)
-    . ' --maxHotspotRatio ' . escapeshellarg((string)$maxHotspotRatio);
+    . ' --maxBalanceRatio ' . escapeshellarg((string)$maxBalanceRatio);
 
 $descriptorspec = [
     0 => ['pipe', 'r'],

@@ -196,13 +196,9 @@ export default function Home(){
     formData.append('sessionId', sessionId);
     formData.append('minBrightness', '50');
     formData.append('maxBrightness', '200');
-    formData.append('minContrast', '32');
-    formData.append('balanceThreshold', '40');
-    formData.append('maxBalanceRatio', '0.22');
-    formData.append('highlightLevel', '245');
-    formData.append('maxHighlightRatio', '0.08');
-    formData.append('hotspotLevel', '230');
-    formData.append('maxHotspotRatio', '0.015');
+    formData.append('minContrast', '40');
+    formData.append('balanceThreshold', '80');
+    formData.append('maxBalanceRatio', '0.95');
 
     const res = await fetch('http://127.0.0.1:8000/server/api/analyze_bad_lighting.php', {
       method: 'POST',
@@ -426,9 +422,9 @@ export default function Home(){
     const blurThreshold = parseInt(document.getElementById('blurThreshold')?.value || '1500',10);
     const darkThreshold = parseInt(document.getElementById('darkThreshold')?.value || '60',10);
     const brightThreshold = parseInt(document.getElementById('brightThreshold')?.value || '200',10);
-    const detectBlur = detectBlurEnabled;
-    const detectLight = detectLightingEnabled;
-    const detectDuplicates = detectDuplicatesEnabled;
+    const detectBlur = document.getElementById('detectBlur')?.checked;
+    const detectLight = document.getElementById('detectLight')?.checked;
+    const detectDuplicates = document.getElementById('detectDuplicates')?.checked;
 
     for(const it of items){ const isDup = duplicates.has(it.file.name); const isBlurry = it.lapVar < blurThreshold; const badLight = (it.luminance < darkThreshold) || (it.luminance > brightThreshold); let score=0; if(detectBlur && !isBlurry) score++; if(detectLight && !badLight) score++; if(detectDuplicates && !isDup) score++; it.score=score; it.isDuplicate=isDup; it.isBlurry=isBlurry; it.badLight=badLight; }
 
@@ -701,6 +697,7 @@ export default function Home(){
                   onChange={(e) => setDetectLightingEnabled(e.target.checked)}
                 /> Detect bad lighting (face)
               </label>
+              <label><input id="detectLight" defaultChecked type="checkbox" style={{marginLeft:8}}/> Detect bad lighting (luminance)</label>
               <div className="controls-center">
                 <button type="button" onClick={handleAnalyzeZip} disabled={!selectedZipFile || inspectingZip || uploadingZip || processingZip || analyzingBlur || analyzingDuplicates || analyzingLighting} className="btn btn-blue">Run Analysis</button>
               </div>

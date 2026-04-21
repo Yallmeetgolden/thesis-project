@@ -93,10 +93,6 @@ def _analyze_lighting(
     min_contrast: float,
     balance_threshold: float,
     max_balance_ratio: float,
-    highlight_level: float,
-    max_highlight_ratio: float,
-    hotspot_level: float,
-    max_hotspot_ratio: float,
 ) -> Dict[str, Any]:
     """
     Analyze lighting quality using simple, tunable thresholds.
@@ -125,9 +121,6 @@ def _analyze_lighting(
 
     brightness = float(np.mean(roi))
     contrast = float(np.std(roi))
-    highlight_ratio = float(np.mean(roi >= highlight_level))
-    hotspot_ratio = float(np.mean(roi >= hotspot_level))
-    p99_brightness = float(np.percentile(roi.astype(np.float32), 99.0))
 
     h, w = roi.shape
     cx1 = int(0.20 * w)
@@ -148,54 +141,23 @@ def _analyze_lighting(
     reasons = []
     has_bad_lighting = False
 
-    def _add_reason(reason: str) -> None:
-        if reason not in reasons:
-            reasons.append(reason)
-
-    # Portraits in dim scenes naturally have lower contrast; use an adaptive floor.
-    min_contrast_effective = min_contrast
-    if brightness < 80.0:
-        min_contrast_effective = max(18.0, min_contrast * 0.65)
-    elif brightness < 110.0:
-        min_contrast_effective = max(20.0, min_contrast * 0.80)
-
     # Check brightness
     if brightness < min_brightness:
         has_bad_lighting = True
-        _add_reason("too_dark")
+        reasons.append("too_dark")
     elif brightness > max_brightness:
         has_bad_lighting = True
-        _add_reason("too_bright_washed_out")
-
-    # Detect clipped highlights that can look "bright enough" but lose detail.
-    if highlight_ratio > max_highlight_ratio:
-        has_bad_lighting = True
-        _add_reason("overexposed_highlights")
-
-    # Catch bright hot spots even when clipped-area ratio is still low.
-    if brightness >= 115.0 and (hotspot_ratio > max_hotspot_ratio or p99_brightness >= 250.0):
-        has_bad_lighting = True
-        _add_reason("overexposed_hotspots")
-
-    # Secondary guard for slightly lower clipping but still strong bright-face hotspots.
-    if brightness >= 105.0 and hotspot_ratio > (max_hotspot_ratio * 0.70) and p99_brightness >= 245.0:
-        has_bad_lighting = True
-        _add_reason("overexposed_hotspots")
-
-    # Extra guard: bright images with weak contrast usually feel washed out.
-    if brightness > (max_brightness - 10.0) and contrast < (min_contrast + 8.0):
-        has_bad_lighting = True
-        _add_reason("washed_out_low_detail")
+        reasons.append("too_bright_washed_out")
 
     # Check contrast
-    if contrast < min_contrast_effective:
+    if contrast < min_contrast:
         has_bad_lighting = True
-        _add_reason("low_contrast")
+        reasons.append("low_contrast")
 
     # Check balance
     if balance_diff > balance_threshold and balance_ratio > max_balance_ratio:
         has_bad_lighting = True
-        _add_reason("unbalanced_lighting")
+        reasons.append("unbalanced_lighting")
 
     return {
         "brightness": round(brightness, 2),
@@ -204,10 +166,6 @@ def _analyze_lighting(
         "right_brightness": round(right_brightness, 2),
         "balance_diff": round(balance_diff, 2),
         "balance_ratio": round(balance_ratio, 4),
-        "highlight_ratio": round(highlight_ratio, 4),
-        "hotspot_ratio": round(hotspot_ratio, 4),
-        "p99_brightness": round(p99_brightness, 2),
-        "min_contrast_effective": round(min_contrast_effective, 2),
         "region_used": region_used,
         "face_detected": face is not None,
         "has_bad_lighting": has_bad_lighting,
@@ -219,13 +177,9 @@ def run(
     images_dir: Path,
     min_brightness: float = 50.0,
     max_brightness: float = 200.0,
-    min_contrast: float = 32.0,
+    min_contrast: float = 40.0,
     balance_threshold: float = 40.0,
     max_balance_ratio: float = 0.22,
-    highlight_level: float = 245.0,
-    max_highlight_ratio: float = 0.08,
-    hotspot_level: float = 230.0,
-    max_hotspot_ratio: float = 0.015,
 ) -> Dict[str, Any]:
     """
     Analyze all images in a directory for bad lighting.
@@ -250,9 +204,6 @@ def run(
     reason_counts: Dict[str, int] = {
         "too_dark": 0,
         "too_bright_washed_out": 0,
-        "overexposed_highlights": 0,
-        "overexposed_hotspots": 0,
-        "washed_out_low_detail": 0,
         "low_contrast": 0,
         "unbalanced_lighting": 0,
     }
@@ -277,10 +228,6 @@ def run(
             min_contrast,
             balance_threshold,
             max_balance_ratio,
-            highlight_level,
-            max_highlight_ratio,
-            hotspot_level,
-            max_hotspot_ratio,
         )
 
         if metrics["has_bad_lighting"]:
@@ -297,10 +244,6 @@ def run(
                 "right_brightness": metrics["right_brightness"],
                 "balance_diff": metrics["balance_diff"],
                 "balance_ratio": metrics["balance_ratio"],
-                "highlight_ratio": metrics["highlight_ratio"],
-                "hotspot_ratio": metrics["hotspot_ratio"],
-                "p99_brightness": metrics["p99_brightness"],
-                "min_contrast_effective": metrics["min_contrast_effective"],
                 "region_used": metrics["region_used"],
                 "face_detected": metrics["face_detected"],
                 "has_bad_lighting": metrics["has_bad_lighting"],
@@ -330,10 +273,6 @@ def run(
             "min_contrast": min_contrast,
             "balance_threshold": balance_threshold,
             "max_balance_ratio": max_balance_ratio,
-            "highlight_level": highlight_level,
-            "max_highlight_ratio": max_highlight_ratio,
-            "hotspot_level": hotspot_level,
-            "max_hotspot_ratio": max_hotspot_ratio,
         },
         "goodLightingFiles": good_lighting,
         "badLightingFiles": bad_lighting,
@@ -345,13 +284,9 @@ def parse_args():
     parser.add_argument("--imagesDir", required=True, help="Absolute path to images directory")
     parser.add_argument("--minBrightness", type=float, default=50.0, help="Min brightness (0-255). Darker → bad lighting")
     parser.add_argument("--maxBrightness", type=float, default=200.0, help="Max brightness (0-255). Brighter → washed out")
-    parser.add_argument("--minContrast", type=float, default=32.0, help="Base min contrast (std dev). Analyzer adapts this by brightness")
+    parser.add_argument("--minContrast", type=float, default=40.0, help="Min contrast (std dev). Lower → flat/no detail")
     parser.add_argument("--balanceThreshold", type=float, default=40.0, help="Max L-R brightness diff. Higher → unbalanced")
     parser.add_argument("--maxBalanceRatio", type=float, default=0.22, help="Max relative L-R diff ratio. Higher → unbalanced")
-    parser.add_argument("--highlightLevel", type=float, default=245.0, help="Pixel intensity treated as blown highlight")
-    parser.add_argument("--maxHighlightRatio", type=float, default=0.08, help="Max allowed blown-highlight ratio")
-    parser.add_argument("--hotspotLevel", type=float, default=230.0, help="Pixel intensity treated as bright hotspot")
-    parser.add_argument("--maxHotspotRatio", type=float, default=0.015, help="Max allowed bright-hotspot ratio")
     return parser.parse_args()
 
 
@@ -371,10 +306,6 @@ def main() -> int:
             min_contrast=args.minContrast,
             balance_threshold=args.balanceThreshold,
             max_balance_ratio=args.maxBalanceRatio,
-            highlight_level=args.highlightLevel,
-            max_highlight_ratio=args.maxHighlightRatio,
-            hotspot_level=args.hotspotLevel,
-            max_hotspot_ratio=args.maxHotspotRatio,
         )
         print(json.dumps(result))
         return 0
